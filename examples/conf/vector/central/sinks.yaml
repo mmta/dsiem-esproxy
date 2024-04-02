@@ -8,6 +8,7 @@ sinks:
     type: elasticsearch
     inputs:
       - transform_suricata
+      - transform_random_netdevice
       - norm_event_*
     endpoints:
       - http://elasticsearch:9200

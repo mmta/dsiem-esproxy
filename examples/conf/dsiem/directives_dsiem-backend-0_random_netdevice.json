@@ -1,56 +1,56 @@
 {
   "directives": [
     {
-      "name": "Ping Flood to DST_IP",
-      "kingdom": "Reconnaissance & Probing",
-      "category": "Misc Activity",
-      "id": 2,
-      "priority": 3,
+      "name": "Random netdevice, malware detected",
+      "kingdom": "Privilege Escalation",
+      "category": "Abuse Elevation Control Mechanism",
+      "id": 1337,
+      "priority": 5,
       "rules": [
         {
-          "name": "ICMP Ping",
+          "name": "Random netdevice event",
           "type": "PluginRule",
           "stage": 1,
-          "plugin_id": 1001,
+          "plugin_id": 31337,
           "plugin_sid": [
-            2100384
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10
           ],
           "occurrence": 1,
           "from": "ANY",
-          "to": "HOME_NET",
+          "to": "ANY",
           "port_from": "ANY",
           "port_to": "ANY",
-          "protocol": "ICMP",
+          "protocol": "ANY",
           "reliability": 1,
           "timeout": 0
         },
         {
-          "name": "ICMP Ping",
+          "name": "Random netdevice event",
           "type": "PluginRule",
           "stage": 2,
-          "plugin_id": 1001,
+          "plugin_id": 31337,
           "plugin_sid": [
-            2100384
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10
           ],
           "occurrence": 3,
-          "from": "ANY",
+          "from": ":1",
           "to": ":1",
           "port_from": "ANY",
           "port_to": "ANY",
           "protocol": "ICMP",
           "reliability": 6,
-          "timeout": 3600
+          "timeout": 600
         },
         {
           "name": "ICMP Ping",
           "type": "PluginRule",
           "stage": 3,
-          "plugin_id": 1001,
+          "plugin_id": 31337,
           "plugin_sid": [
-            2100384
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10
           ],
           "occurrence": 10000,
-          "from": "ANY",
+          "from": ":1",
           "to": ":1",
           "port_from": "ANY",
           "port_to": "ANY",

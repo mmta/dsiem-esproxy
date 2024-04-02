@@ -1,0 +1,15 @@
+
+
+# sink to enable during debugging
+# for example, to debug random_netdevice transform or norm_event generation process, put its component name in the inputs list
+# also note that there is vector tap (https://vector.dev/guides/level-up/vector-tap-guide/) which can be used for debugging
+
+# sinks:
+#   stdout:
+#     type: console
+#     inputs:
+#     - transform_random_netdevice
+#     - norm_event_random_netdevice
+#     target: stdout
+#     encoding:
+#       codec: json
