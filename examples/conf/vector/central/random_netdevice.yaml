@@ -99,7 +99,8 @@ transforms:
 
 # docker run -v $(pwd)/conf/vector/central:/etc/vector timberio/vector:latest-alpine test --config-dir /etc/vector
 
-# should be executed to ensure that incoming changes don't break existing configurations.
+# should be executed as a test in the config repo to ensure that incoming commits
+# don't break existing configurations.
 
 tests:
   - name: "random_netdevice normalized event parser test"
