@@ -52,7 +52,7 @@ end
 - Clone this repo:
 
   ```shell
-  git clone https://github.com/mmta/dsiem-es-proxy.git
+  git clone https://github.com/mmta/dsiem-esproxy.git
   ```
 - Start the docker compose environment (replace `eth0` with appropriate network interface):
   ```shell
