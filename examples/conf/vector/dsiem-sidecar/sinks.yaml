@@ -1,0 +1,30 @@
+sinks:
+
+  # insert alarm_events to elasticsearch, note that this doesn't include
+  # an index-template like in logstash.
+
+  elasticsearch:
+    type: elasticsearch
+    inputs:
+      - transform_dsiem_alarm_events
+    endpoints:
+      - http://elasticsearch:9200
+    mode: bulk
+    bulk:
+      index: "{{ index_name }}-%Y.%m.%d"
+
+  # post alarms to dsiem-es-proxy, which will insert/update them in elasticsearch
+  # note on authentication: dsiem-es-proxy will forward any authentication headers
+  # to elasticsearch, so if ES requires authentication, you can set it in the
+  # this sink.
+  # Reference: https://vector.dev/docs/reference/configuration/sinks/http/#auth
+  
+  dsiem_es_proxy:
+    type: http
+    inputs:
+      - transform_dsiem_alarms
+    encoding:
+      codec: json
+    method: post
+    uri: http://dsiem-esproxy:8181/alarms
+

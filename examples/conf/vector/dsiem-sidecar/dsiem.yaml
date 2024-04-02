@@ -1,0 +1,39 @@
+# this config file is used to send dsiem-backend logs to elasticsearch and to dsiem-es-proxy
+# - siem_alarm_events.json will be sent directly to elasticsearch
+# - siem_alarms.json will be sent to dsiem-es-proxy so that it can insert new alarms
+#   or update existing ones in elasticsearch
+
+sources:
+  dsiem_alarm_events:
+    type: "file"
+    include:
+      - "/var/log/dsiem/siem_alarm_events.json"
+  dsiem_alarms:
+    type: "file"
+    include:
+      - "/var/log/dsiem/siem_alarms.json"
+
+transforms:    
+  transform_dsiem_alarm_events:
+    type: remap
+    inputs:
+      - dsiem_alarm_events
+    drop_on_abort: true
+    drop_on_error: true
+    
+    # this just adds @timestamp for kibana and index_name for the elasticsearch sink
+    source: |-
+      . = parse_json!(.message)
+      .index_name = "siem_alarm_events"
+      .@timestamp = now()
+
+  transform_dsiem_alarms:
+    type: remap
+    inputs:
+      - dsiem_alarms
+    drop_on_abort: true
+    drop_on_error: true
+
+    # here the format is already aligned with what dsiem-es-proxy expects
+    source: |-
+      . = parse_json!(.message)

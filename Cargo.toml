@@ -1,0 +1,30 @@
+[package]
+name = "dsiem-esproxy"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+opt-level = 3
+strip = true
+codegen-units = 1
+panic = "abort"
+lto = true
+
+[dependencies]
+tracing = { version = "0.1", features = [ "attributes" ], default-features = false }
+tracing-subscriber = { version = "0.3", features = ["json", "ansi"], default-features = false }
+tokio = { version = "1.25", features = ["sync", "rt-multi-thread"] }
+serde = { version = "1.0", features = ["rc"], default-features = false }
+serde_json = { version = "1.0", default-features = false }
+serde_derive = "1.0"
+anyhow = "1.0.81"
+clap = { version = "4.1", features = ["help", "std", "derive", "env" ], optional = false, default-features = false}
+dsiem = { git = "https://github.com/defenxor/dsiem-rs" }
+axum = { version = "0.7", features = ["macros", "json", "tokio", "http1" ], default-features = false }
+axum-extra = { version = "0.9", features = ["erased-json"] }
+tower-http = { version = "0.5", features = ["timeout"] , default-features = false }
+arcstr = "1.1.5"
+reqwest = { version = "0.12.2", features = ["rustls-tls", "json"], default-features = false}
+
+chrono = { version = "0.4.37", default-features = false }
+mini-moka = "0.10.3"

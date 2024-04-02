@@ -1,0 +1,13 @@
+{
+  "status": [
+    "Open",
+    "In-Progress",
+    "Closed"
+  ],
+  "tags": [
+    "Identified Threat",
+    "False Positive",
+    "Valid Threat",
+    "Security Incident"
+  ]
+}

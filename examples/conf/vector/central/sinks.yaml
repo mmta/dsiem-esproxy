@@ -1,0 +1,61 @@
+sinks:
+
+  # this sink sends suricata logs to its own index and normalized events to siem_events.
+  # this single sink can be used by multiple source logs by adding their respective transforms
+  # to the inputs list, and making sure each has a norm_event_* transform.
+
+  elasticsearch:
+    type: elasticsearch
+    inputs:
+      - transform_suricata
+      - norm_event_*
+    endpoints:
+      - http://elasticsearch:9200
+    mode: bulk
+    bulk:
+      index: "{{ index_name }}-%Y.%m.%d"
+
+  # this sends normalized events to dsiem frontend. same as above, this single
+  # sink can be used by multiple source logs as long as they have a norm_event_* transform.
+
+  dsiem_frontend:
+    type: http
+    inputs:
+      - norm_event_*
+    encoding:
+      codec: "json"
+    method: post
+    uri: http://dsiem-frontend:8080/events
+    buffer:
+      max_events: 32768
+      when_full: "drop_newest"
+      type: "memory"
+    request:
+      retry_attempts: 5
+
+#####################################################################################
+#  example of non-batch (not-recommended) alternative sink for dsiem_frontend:
+#  
+#  this config is compatible with dsiem-go frontend, which doesn't support
+#  receiving array of events in a single request. By default vector will send
+#  events in batches, which is more efficient, but is supported only by dsiem-rs 
+#  frontend.
+#
+######################################################################################
+#
+#  dsiem_frontend:
+#    type: http
+#    inputs:
+#      - norm_event_suricata
+#    encoding:
+#      codec: "json"
+#    batch:
+#      max_events: 1
+#    method: post
+#    uri: http://dsiem-frontend:8080/events
+#    request:
+#      headers: { 
+#        "Content-Type": "application/json"
+#      }
+#    framing:
+#      method: "newline_delimited"

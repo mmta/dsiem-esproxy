@@ -1,0 +1,96 @@
+# this config file is used to send suricata logs to elasticsearch and to dsiem-frontend.
+# here we just ingest log from local file, but in production you would want to send 
+# logs from suricata by using a vector/filebeat sidecar on the same host as suricata.
+#
+# Here suricata eve.json will be parsed and sent to its own suricata-* index in elasticsearch
+# The same event will then be normalized, and sent to:
+# - elasticsearch to be stored in index siem_events
+# - dsiem-frontend for siem processing
+
+sources:
+  suricata:
+    type: "file"
+    include:
+      - "/var/log/suricata/eve.json"  
+  
+transforms:
+
+  # this filter only allows suricata alerts to pass through, all other events like dns query etc
+  # will be dropped
+
+  filter_suricata:
+    type: filter
+    inputs:
+      - suricata
+    condition:
+      type: "vrl"
+      source: |-
+        m = parse_json!(.message)
+        m.event_type == "alert"
+      
+  # this parses the json message and adds:
+  # - the host field to the root of the json, later to be used as the sensor field
+  # - the index_name field to the root of the json, later to be used as the index name
+  #   by the elasticsearch sink
+
+  transform_suricata:
+    type: remap
+    inputs:
+      - filter_suricata
+    drop_on_abort: true
+    drop_on_error: true
+    source: |-
+      temp = .host
+      . = parse_json!(.message)
+      .host = temp
+      .index_name = "suricata"
+
+  # this takes the transformed suricata event, and turns it into a normalized event
+  # to be sent to dsiem frontend
+
+  norm_event_suricata:
+    type: remap
+    inputs:
+      - transform_suricata
+    drop_on_abort: true
+    drop_on_error: true
+
+    # sets the following fields:
+    # - index_name: to be used by the elasticsearch sink
+    # - @timestamp: to be used by the elasticsearch sink
+    # - the rest are custom fields to be used by dsiem frontend
+    
+    source: |-
+      .index_name = "siem_events"
+      .@timestamp = now()
+      .event_id = uuid_v4()
+      .title = .alert.signature
+      .sensor = .host
+      .product = "Intrusion Detection System"
+      .category = .alert.category
+      .src_ip = .src_ip
+      .dst_ip = del(.dest_ip)
+      .protocol = .proto
+      .plugin_id = 1001
+      .plugin_sid = .alert.signature_id
+      .custom_label1 = "payload printable"
+      .custom_data1 = .payload_printable
+      .src_port = if is_null(.src_port) {
+        0
+      } else {
+        .src_port
+      }
+      .dst_port = if is_null(.dest_port) {
+        0
+      } else {
+        .dest_port
+      }
+      del(.alert)
+      del(.stream)
+      del(.in_iface)
+      del(.event_type)
+    
+    # The del()s above remove fields that are not needed. This is optional since 
+    # the frontend will ignore any fields it doesn't know about anyway.
+    # However, if the source events are large, then it is still preferable to delete 
+    # extra fields to reduce network usage.
