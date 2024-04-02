@@ -1,3 +1,4 @@
 /target
 /dev
 .vscode
+examples/conf/dsiem/dsiem_config.json
