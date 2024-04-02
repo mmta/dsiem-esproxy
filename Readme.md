@@ -73,7 +73,7 @@ end
 
 ## Misc Info
 
-- Docker image is available from [dockerhub](). Refer to the compose example on how to use it, and the CLI `--help` parameter to see all the valid arguments.
+- Docker image is available from [dockerhub](https://hub.docker.com/r/mmta/dsiem-esproxy). Refer to the compose example on how to use it, and the CLI `--help` parameter to see all the valid arguments.
 
 - Use or review the [Dockerfile](./Dockerfile) on how to build the project.
   ```shell
