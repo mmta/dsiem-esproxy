@@ -85,3 +85,35 @@ transforms:
       .event_id = uuid_v4()
 
 
+# the following is an example test case for the above transforms.
+# the test supplies a log line to the transform_random_netdevice, and assert the
+# output of norm_event_random_netdevice. The test can be run using the command:
+
+# vector test /etc/vector/random_netdevice.yaml
+
+# As an example, try changing .plugin_sid below to 7, and run the test. The test
+# should fail with an error message.
+
+# This type of tests should be written for all log sources, and the tests should 
+# be run before deploying the pipeline to production, and the following command:
+
+# docker run -v $(pwd)/conf/vector/central:/etc/vector timberio/vector:latest-alpine test --config-dir /etc/vector
+
+# should be executed to ensure that incoming changes don't break existing configurations.
+
+tests:
+  - name: "random_netdevice normalized event parser test"
+    inputs:
+      - insert_at: transform_random_netdevice
+        value: |
+          <12>2 2024-04-02T21:52:45.043Z we.pizza ahmadajmi 1340 ID810 - A bug was encountered but not in Vector, which doesnt have bugs
+    outputs:
+      - extract_from: norm_event_random_netdevice
+        conditions:
+          - type: "vrl"
+            source: |-
+              assert!(.plugin_id == 31337)
+              assert!(.plugin_sid == 6)
+              assert!(.title == "Random device event: ahmadajmi")
+              assert!(is_ipv4!(.dst_ip))
+              assert!(is_integer(.src_port))
