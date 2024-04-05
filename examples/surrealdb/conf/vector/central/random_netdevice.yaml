@@ -83,6 +83,7 @@ transforms:
       . = .norm_event
       .index_name = "siem_events"
       .event_id = uuid_v4()
+      .id = string(.event_id)
 
 
 # the following is an example test case for the above transforms.

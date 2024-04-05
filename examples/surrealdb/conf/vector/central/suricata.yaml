@@ -51,6 +51,7 @@ transforms:
       norm_event.plugin_sid = .alert.signature_id
       norm_event.custom_label1 = "payload printable"
       norm_event.custom_data1 = .payload_printable
+      norm_event.id = string(norm_event.event_id)
       norm_event.src_port = if is_null(.src_port) {
         0
       } else {

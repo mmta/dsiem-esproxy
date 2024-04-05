@@ -24,8 +24,9 @@ transforms:
     # this just adds @timestamp for kibana and index_name for the elasticsearch sink
     source: |-
       . = parse_json!(.message)
-      .index_name = "siem_alarm_events"
       .@timestamp = now()
+      .alarm_id = "alarm:" + string!(.alarm_id)
+      .event_id = "event:⟨" + string!(.event_id) + "⟩"
 
   transform_dsiem_alarms:
     type: remap
