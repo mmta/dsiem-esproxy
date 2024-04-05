@@ -1,0 +1,64 @@
+sources:
+  suricata:
+    type: "file"
+    include:
+      - "/var/log/suricata/eve.json"  
+  
+transforms:
+
+  filter_suricata:
+    type: filter
+    inputs:
+      - suricata
+    condition:
+      type: "vrl"
+      source: |-
+        m = parse_json!(.message)
+        m.event_type == "alert"
+
+  transform_suricata:
+    type: remap
+    inputs:
+      - filter_suricata
+    drop_on_abort: true
+    drop_on_error: true
+    source: |-
+      temp = .host
+      . = parse_json!(.message)
+      .host = temp
+      .index_name = "suricata"
+
+  norm_event_suricata:
+    type: remap
+    inputs:
+      - transform_suricata
+    drop_on_abort: true
+    drop_on_error: true
+    
+    source: |-
+      norm_event.timestamp = .timestamp
+      norm_event.index_name = "siem_events"
+      norm_event.@timestamp = now()
+      norm_event.event_id = uuid_v4()
+      norm_event.title = .alert.signature
+      norm_event.sensor = .host
+      norm_event.product = "Intrusion Detection System"
+      norm_event.category = .alert.category
+      norm_event.src_ip = .src_ip
+      norm_event.dst_ip = del(.dest_ip)
+      norm_event.protocol = .proto
+      norm_event.plugin_id = 1001
+      norm_event.plugin_sid = .alert.signature_id
+      norm_event.custom_label1 = "payload printable"
+      norm_event.custom_data1 = .payload_printable
+      norm_event.src_port = if is_null(.src_port) {
+        0
+      } else {
+        .src_port
+      }
+      norm_event.dst_port = if is_null(.dest_port) {
+        0
+      } else {
+        .dest_port
+      }
+      . = norm_event

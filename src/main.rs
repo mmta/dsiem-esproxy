@@ -64,6 +64,7 @@ struct ServeArgs {
     /// TCP port for the HTTP server to listen on
     #[arg(short('p'), long = "tcp-port", env = "DSIEM_ESPROXY_PORT", value_name = "tcp", default_value_t = 8181)]
     port: u16,
+    /// Elasticsearch endpoint
     #[arg(
         short('e'),
         long = "es-endpoint",
@@ -72,14 +73,24 @@ struct ServeArgs {
         default_value = "http://localhost:9200"
     )]
     elasticsearch: String,
+    /// Whether to use enable alarm output to Elasticsearch
     #[arg(
-        short('d'),
+        long = "use-elasticsearch",
+        value_name = "boolean",
+        env = "DSIEM_ESPROXY_USE_ELASTICSEARCH",
+        default_value_t = true
+    )]
+    use_elasticsearch: bool,
+    /// Elasticsearch index for alarm id lookup
+    #[arg(
+        short('x'),
         long = "es-id-index",
         env = "DSIEM_ESPROXY_ID_INDEX",
         value_name = "url",
         default_value = "siem_alarms_id_lookup"
     )]
     id_index: String,
+    /// Elasticsearch index for upserting alarms
     #[arg(
         short('i'),
         long = "es-alarm-index",
@@ -110,9 +121,44 @@ struct ServeArgs {
         default_value = "Identified Threat,False Positive,Valid Threat,Security Incident"
     )]
     tag: Vec<String>,
-    /// whether to upsert the default index_alarms template
+    /// whether to upsert the default index_alarms template to elasticsearch
     #[arg(long = "upsert-index-alarms-template", value_name = "boolean", default_value_t = true)]
     upsert_template: bool,
+    /// SurrealDB endpoint
+    #[arg(
+        short('b'),
+        long = "surrealdb-endpoint",
+        env = "DSIEM_ESPROXY_SURREALDB",
+        value_name = "url",
+        default_value = "http://localhost:8000"
+    )]
+    surrealdb: String,
+    /// SurrealDB namespace
+    #[arg(long = "surrealdb-ns", env = "DSIEM_ESPROXY_SURREALDB_NS", value_name = "string", default_value = "default")]
+    surrealdb_ns: String,
+    /// SurrealDB database
+    #[arg(long = "surrealdb-db", env = "DSIEM_ESPROXY_SURREALDB_DB", value_name = "string", default_value = "dsiem")]
+    surrealdb_db: String,
+    /// SurrealDB table name for alarms
+    #[arg(
+        long = "surrealdb-table",
+        env = "DSIEM_ESPROXY_SURREALDB_TABLE",
+        value_name = "string",
+        default_value = "alarm"
+    )]
+    surrealdb_table: String,
+    /// Whether to use enable alarm output to SurrealDB. Note that
+    /// --use-elasticsearch must be explicitly set to false to use SurrealDB
+    #[arg(
+        long = "use-surrealdb",
+        value_name = "boolean",
+        env = "DSIEM_ESPROXY_USE_SURREALDB",
+        default_value_t = false
+    )]
+    use_surrealdb: bool,
+    /// whether to upsert a default dsiem schema to surrealdb
+    #[arg(long = "upsert-dsiem-schema", value_name = "boolean", default_value_t = true)]
+    upsert_schema: bool,
 }
 
 #[tokio::main]
@@ -164,12 +210,23 @@ async fn serve(listen: bool, require_logging: bool, args: Cli) -> Result<()> {
     set.spawn(async move {
         let app = server::app(
             test_env,
-            &sargs.elasticsearch,
-            &sargs.id_index,
-            &sargs.alarm_index,
+            server::ESSink {
+                url: sargs.elasticsearch.into(),
+                enabled: sargs.use_elasticsearch,
+                upsert_template: sargs.upsert_template,
+                id_index: sargs.id_index.into(),
+                alarm_index: sargs.alarm_index.into(),
+            },
+            server::SurrealDBSink {
+                url: sargs.surrealdb.into(),
+                enabled: sargs.use_surrealdb,
+                namespace: sargs.surrealdb_ns.into(),
+                db: sargs.surrealdb_db.into(),
+                alarm_table: sargs.surrealdb_table.into(),
+                upsert_schema: sargs.upsert_schema,
+            },
             sargs.status,
             sargs.tag,
-            sargs.upsert_template,
         )?;
         let listener = tokio::net::TcpListener::bind(addr.clone()).await?;
         let signal = async move {

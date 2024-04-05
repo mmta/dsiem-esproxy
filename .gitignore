@@ -2,3 +2,5 @@
 /dev
 .vscode
 examples/conf/dsiem/dsiem_config.json
+surreal
+history.txt

@@ -31,44 +31,58 @@ use app_error::AppError;
 #[derive(Clone)]
 pub struct AppState {
     pub _test_env: bool,
-    pub elasticsearch_url: ArcStr,
-    // index to use for alarm location (perm_index) lookup
-    pub id_index: ArcStr,
-    // index to use for alarm insert/update
-    pub alarm_index: ArcStr,
-    // valid entries for status and tag
+    pub es: Arc<ESSink>,
+    pub surrealdb: Arc<SurrealDBSink>,
     pub valid_status: Arc<Vec<ArcStr>>,
     pub valid_tag: Arc<Vec<ArcStr>>,
     // cache for storing alarm ID lookup results
     pub cache: Cache<ArcStr, ArcStr>,
-    // whether we should put the siem_alarms template
+    // whether we should put the siem_alarms template to ES
     pub upsert_template: Arc<AtomicBool>,
+    // whether we should put the dsiem schema template to SurrealDB
+    pub upsert_schema: Arc<AtomicBool>,
 }
 
+#[derive(Clone)]
+pub struct ESSink {
+    pub url: ArcStr,
+    pub enabled: bool,
+    pub id_index: ArcStr,
+    pub alarm_index: ArcStr,
+    pub upsert_template: bool,
+}
+#[derive(Clone)]
+pub struct SurrealDBSink {
+    pub url: ArcStr,
+    pub enabled: bool,
+    pub namespace: ArcStr,
+    pub db: ArcStr,
+    pub alarm_table: ArcStr,
+    pub upsert_schema: bool,
+}
 pub fn app(
     _test_env: bool,
-    elasticsearch_url: &str,
-    id_index: &str,
-    alarm_index: &str,
+    elasticsearch: ESSink,
+    surrealdb: SurrealDBSink,
     valid_status: Vec<String>,
     valid_tag: Vec<String>,
-    upsert_template: bool,
 ) -> Result<Router> {
     // Time to live (TTL): 24 hours
     // Time to idle (TTI):  30 minutes
     let cache =
         Cache::builder().time_to_live(Duration::from_secs(86400)).time_to_idle(Duration::from_secs(1800)).build();
-    let upsert_template = Arc::new(AtomicBool::new(upsert_template));
+    let upsert_template = Arc::new(AtomicBool::new(elasticsearch.upsert_template));
+    let upsert_schema = Arc::new(AtomicBool::new(surrealdb.upsert_schema));
 
     let state = AppState {
         _test_env,
-        elasticsearch_url: elasticsearch_url.into(),
-        id_index: id_index.into(),
-        alarm_index: alarm_index.into(),
+        es: Arc::new(elasticsearch),
+        surrealdb: Arc::new(surrealdb),
         valid_status: Arc::new(valid_status.iter().map(|s| s.into()).collect()),
         valid_tag: Arc::new(valid_tag.iter().map(|s| s.into()).collect()),
         cache,
         upsert_template,
+        upsert_schema,
     };
 
     fn routes(state: AppState) -> Router {
@@ -92,16 +106,6 @@ pub async fn alarms_handler(
     JsonExtractor(value): JsonExtractor<Value>,
 ) -> Result<(), AppError> {
     let auth_header = headers.get("Authorization").map(|v| v.to_str().unwrap_or_default());
-
-    // upsert template once if enabled
-    if state.upsert_template.load(Ordering::Relaxed) {
-        info!("upserting siem_alarms template to {}", state.elasticsearch_url);
-        upsert_siem_alarms_template(&state.elasticsearch_url, auth_header).await.map_err(|e| {
-            error!("failed to upsert siem_alarms template: {}", e);
-            AppError::from(e)
-        })?;
-        state.upsert_template.store(false, Ordering::Relaxed);
-    }
 
     let alarms = if !value.is_array() {
         let alarm: Backlog = serde_json::from_value(value).map_err(|e| {
@@ -127,34 +131,146 @@ pub async fn alarms_handler(
             error!(alarm.id, "validate error: {}", s);
             AppError::new(StatusCode::BAD_REQUEST, &s)
         })?;
-        let alarm_id = ArcStr::from(alarm.id.clone());
-        let perm_index = if let Some(v) = state.cache.get(&alarm_id) {
-            debug!(alarm.id, "using cached permanent index {}", v);
-            v.clone()
-        } else {
-            match get_perm_index(&state.elasticsearch_url, &state.id_index, auth_header, &alarm.id, &state.cache).await
-            {
-                Some(v) => v,
-                _ => {
-                    let f = &format!("{}-{}", state.alarm_index, Utc::now().format("%Y.%m.%d"));
-                    f.into()
-                }
-            }
-        };
-
-        let mut msg = format!("sending alarm to {}/{}", state.elasticsearch_url, perm_index);
-
-        if auth_header.is_some() {
-            msg.push_str(" with supplied authorization header");
+        if state.es.enabled {
+            send_alarm_to_elasticsearch(&state, alarm, auth_header).await?;
+        } else if state.surrealdb.enabled {
+            send_alarm_to_surrealdb(&state, alarm, auth_header).await?;
         }
-        debug!(alarm.id, "{}", msg);
-
-        send_alarm(&state.elasticsearch_url, &perm_index, auth_header, alarm).await.map_err(|e| {
-            warn!(alarm.id = alarm_id.to_string(), "failed to send alarm: {}", e);
-            AppError::from(e)
-        })?;
     }
     Result::Ok(())
+}
+
+async fn send_alarm_to_surrealdb(state: &AppState, alarm: Backlog, auth_header: Option<&str>) -> Result<(), AppError> {
+    // upsert schema once if enabled
+    if state.upsert_schema.load(Ordering::Relaxed) {
+        info!(
+            "upserting dsiem schema to {}, namespace: {}, database: {}",
+            state.surrealdb.url, state.surrealdb.namespace, state.surrealdb.db
+        );
+        upsert_dsiem_schema(&state.surrealdb.url, &state.surrealdb.namespace, &state.surrealdb.db, auth_header)
+            .await
+            .map_err(|e| {
+            error!("failed to upsert dsiem schema: {}", e);
+            AppError::from(e)
+        })?;
+        state.upsert_schema.store(false, Ordering::Relaxed);
+    }
+
+    let mut msg = format!("sending alarm to {}", state.surrealdb.url);
+    if auth_header.is_some() {
+        msg.push_str(" with supplied authorization header");
+    }
+    let alarm_id = alarm.id.clone();
+    debug!(alarm.id, "{}", msg);
+    send_alarm_surrealdb(
+        &state.surrealdb.url,
+        &state.surrealdb.namespace,
+        &state.surrealdb.db,
+        &state.surrealdb.alarm_table,
+        auth_header,
+        alarm,
+    )
+    .await
+    .map_err(|e| {
+        warn!(alarm.id = alarm_id, "failed to send alarm: {}", e);
+        AppError::from(e)
+    })
+}
+
+async fn upsert_dsiem_schema(surrealdb_url: &str, ns: &str, db: &str, auth_header: Option<&str>) -> Result<()> {
+    let client = reqwest::Client::new();
+    let mut req = client.post(format!("{}/import", surrealdb_url)).header("NS", ns).header("DB", db).header("Accept", "application/json");
+    if let Some(auth) = auth_header {
+        req = req.header("Authorization", auth);
+    }
+    let schema = r#"
+        define table alarm;
+        define table event;
+        define table alarm_event; 
+    "#;
+    let result = req.body(schema.to_owned()).send().await?;
+    if result.status().is_success() {
+        info!("dsiem schema uploaded successfully");
+    } else {
+        let status = result.status();
+        let msg = result.text().await.unwrap_or_default();
+        return Err(anyhow!("failed to upload dsiem schema: {}: {}", status, msg));
+    }
+    Ok(())
+}
+async fn send_alarm_surrealdb(
+    surrealdb_url: &str,
+    ns: &str,
+    db: &str,
+    table: &str,
+    auth_header: Option<&str>,
+    alarm: Backlog,
+) -> Result<(), anyhow::Error> {
+    let client = reqwest::Client::new();
+    let mut req =
+        client.post(format!("{}/key/{}/{}", surrealdb_url, table, alarm.id)).header("NS", ns).header("DB", db).header("Accept", "application/json").header("Content-Type", "application/json");
+    if let Some(auth) = auth_header {
+        req = req.header("Authorization", auth);
+    };
+    let alarm_id = alarm.id.clone();
+    let timestamp = DateTime::from_timestamp(alarm.created_time.load(Ordering::Relaxed), 0)
+        .ok_or(anyhow!("alarm {} cannot convert created_time (unix) to timestamp (datetime)", alarm_id))?;
+    let updated_time = DateTime::from_timestamp(alarm.update_time.load(Ordering::Relaxed), 0)
+        .ok_or(anyhow!("alarm {} cannot convert update_time (unix) to updated_time (datetime)", alarm_id))?;
+
+    let mut val = serde_json::to_value(alarm).unwrap();
+    val["timestamp"] = serde_json::Value::String(timestamp.to_rfc3339());
+    val["updated_time"] = serde_json::Value::String(updated_time.to_rfc3339());
+
+    let result = req.json(&val).send().await?;
+    if result.status().is_success() {
+        info!(alarm.id = alarm_id, "alarm sent successfully");
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("failed to send alarm: {}", result.status()))
+    }
+}
+
+async fn send_alarm_to_elasticsearch(
+    state: &AppState,
+    alarm: Backlog,
+    auth_header: Option<&str>,
+) -> Result<(), AppError> {
+    // upsert template once if enabled
+    if state.upsert_template.load(Ordering::Relaxed) {
+        info!("upserting siem_alarms template to {}", state.es.url);
+        upsert_siem_alarms_template(&state.es.url, auth_header).await.map_err(|e| {
+            error!("failed to upsert siem_alarms template: {}", e);
+            AppError::from(e)
+        })?;
+        state.upsert_template.store(false, Ordering::Relaxed);
+    }
+
+    let alarm_id = ArcStr::from(&alarm.id);
+    let perm_index = if let Some(v) = state.cache.get(&alarm_id) {
+        debug!(alarm.id, "using cached permanent index {}", v);
+        v.clone()
+    } else {
+        match get_perm_index(&state.es.url, &state.es.id_index, auth_header, &alarm.id, &state.cache).await {
+            Some(v) => v,
+            _ => {
+                let f = &format!("{}-{}", state.es.alarm_index, Utc::now().format("%Y.%m.%d"));
+                f.into()
+            }
+        }
+    };
+
+    let mut msg = format!("sending alarm to {}/{}", state.es.url, perm_index);
+
+    if auth_header.is_some() {
+        msg.push_str(" with supplied authorization header");
+    }
+    debug!(alarm.id, "{}", msg);
+
+    send_alarm_es(&state.es.url, &perm_index, auth_header, alarm).await.map_err(|e| {
+        warn!(alarm.id = alarm_id.to_string(), "failed to send alarm: {}", e);
+        AppError::from(e)
+    })
 }
 
 async fn upsert_siem_alarms_template(es_url: &str, auth_header: Option<&str>) -> Result<()> {
@@ -244,7 +360,12 @@ struct UpsertAlarm {
     script: ScriptBlock,
 }
 
-async fn send_alarm(es_url: &str, index: &str, auth_header: Option<&str>, alarm: Backlog) -> Result<(), anyhow::Error> {
+async fn send_alarm_es(
+    es_url: &str,
+    index: &str,
+    auth_header: Option<&str>,
+    alarm: Backlog,
+) -> Result<(), anyhow::Error> {
     let client = reqwest::Client::new();
     let mut req = client.post(format!("{}/{}/_update/{}", es_url, index, alarm.id));
     if let Some(auth) = auth_header {

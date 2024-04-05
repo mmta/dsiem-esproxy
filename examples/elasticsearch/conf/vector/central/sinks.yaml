@@ -60,3 +60,12 @@ sinks:
 #      }
 #    framing:
 #      method: "newline_delimited"
+
+
+# this sends normalized events to surrealdb. same as above, this doesn't support bulk mode
+# note that surrealdb namespace and db must be created beforehand.
+
+# this currently doesn't support setting event_id as surrealdb record ID, references:
+# - On the Vector side: https://github.com/vectordotdev/vector/issues/1155
+# - On the SurrealDB side: by design ID can't be updated once created: https://github.com/orgs/surrealdb/discussions/2678
+# So apps have to manually use event_id instead of the record ID.

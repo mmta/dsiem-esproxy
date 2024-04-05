@@ -61,36 +61,29 @@ transforms:
     # - the rest are custom fields to be used by dsiem frontend
     
     source: |-
-      .index_name = "siem_events"
-      .@timestamp = now()
-      .event_id = uuid_v4()
-      .title = .alert.signature
-      .sensor = .host
-      .product = "Intrusion Detection System"
-      .category = .alert.category
-      .src_ip = .src_ip
-      .dst_ip = del(.dest_ip)
-      .protocol = .proto
-      .plugin_id = 1001
-      .plugin_sid = .alert.signature_id
-      .custom_label1 = "payload printable"
-      .custom_data1 = .payload_printable
-      .src_port = if is_null(.src_port) {
+      norm_event.timestamp = .timestamp
+      norm_event.index_name = "siem_events"
+      norm_event.@timestamp = now()
+      norm_event.event_id = uuid_v4()
+      norm_event.title = .alert.signature
+      norm_event.sensor = .host
+      norm_event.product = "Intrusion Detection System"
+      norm_event.category = .alert.category
+      norm_event.src_ip = .src_ip
+      norm_event.dst_ip = del(.dest_ip)
+      norm_event.protocol = .proto
+      norm_event.plugin_id = 1001
+      norm_event.plugin_sid = .alert.signature_id
+      norm_event.custom_label1 = "payload printable"
+      norm_event.custom_data1 = .payload_printable
+      norm_event.src_port = if is_null(.src_port) {
         0
       } else {
         .src_port
       }
-      .dst_port = if is_null(.dest_port) {
+      norm_event.dst_port = if is_null(.dest_port) {
         0
       } else {
         .dest_port
       }
-      del(.alert)
-      del(.stream)
-      del(.in_iface)
-      del(.event_type)
-    
-    # The del()s above remove fields that are not needed. This is optional since 
-    # the frontend will ignore any fields it doesn't know about anyway.
-    # However, if the source events are large, then it is still preferable to delete 
-    # extra fields to reduce network usage.
+      . = norm_event

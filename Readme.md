@@ -6,7 +6,7 @@ This tool replaces Logstash in Dsiem architecture by:
 
 - Upserting the default `siem_alarms` [index template](https://github.com/defenxor/dsiem-rs/blob/master/deployments/docker/conf/logstash/index-template.d/es7/siem_alarms-template.json) to Elasticsearch when there isn't one already exist.
 
-An example of Dsiem architecture that completely replaces Logstash with [Vector](https://vector.dev/) is shown in the diagram below. There is a docker compose deployment for it in [here](./examples). The vector config files in particular have comments that further explain the setup.
+An example of Dsiem architecture that completely replaces Logstash with [Vector](https://vector.dev/) is shown in the diagram below. There is a docker compose deployment for it in [here](./examples/elasticsearch/). The vector config files in particular have comments that further explain the setup.
 
 ```mermaid
 flowchart TB
@@ -20,6 +20,7 @@ db -->|alarm_events|es
 db -->|alarms|ep
 
 s1 -->|eve.json|v3
+s2 -->|syslog|v3
 
 df -->|events through NATS|db
 
@@ -27,9 +28,9 @@ subgraph "Vector (Central)"
  v3[vector]
 end
 
-
-subgraph Suricata
+subgraph Source logs
  s1[suricata]
+ s2[random_netdevice]
 end
 
 subgraph Elasticsearch cluster
@@ -56,13 +57,13 @@ end
   ```
 - Start the docker compose environment (replace `eth0` with appropriate network interface):
   ```shell
-  cd examples/
+  cd examples/elasticsearch
   export PROMISC_INTERFACE=eth0
   docker compose up
   ```
 - From another terminal in the same host, install Kibana dashboard:
   ```shell
-  cd examples/
+  cd examples/elasticsearch
   ./kbndashboard-import.sh localhost ./kibana/dashboard-siem.json 
   ```
 - From another terminal in the same host, ping an external IP, and make sure the traffic goes through that network interface (e.g. `eth0`).
@@ -70,6 +71,31 @@ end
   ping 1.1.1.1
   ```
 - Open Kibana dashboard from http://localhost:5601, and verify that ping related alarms are created in the Dsiem dashboard.
+
+## Surrealdb version
+
+There is another example that also replace Elasticsearch with Surrealdb in [here](./examples/surrealdb/).
+
+- Activate the compose environment: 
+
+  ```shell
+  cd examples/surrealdb
+  export PROMISC_INTERFACE=eth0
+  docker compose up
+  ```
+
+- From another terminal in the same host, ping an external IP, and make sure the traffic goes through that network interface (e.g. `eth0`).
+
+  ```shell
+  ping 1.1.1.1
+  ```
+
+- After that, visit https://surrealist.app/ and use it to connect to:
+
+  - Endpoint: http://localhost:8000
+  - Namespace: default
+  - Database: dsiem
+  - Authentication: Anonymous
 
 ## Misc Info
 

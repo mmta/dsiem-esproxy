@@ -27,4 +27,3 @@ sinks:
       codec: json
     method: post
     uri: http://dsiem-esproxy:8181/alarms
-
