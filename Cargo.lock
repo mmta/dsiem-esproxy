@@ -765,6 +765,7 @@ dependencies = [
  "chrono",
  "clap",
  "dsiem",
+ "json_value_remove",
  "mini-moka",
  "reqwest",
  "serde",
@@ -1315,6 +1316,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29c15563dc2726973df627357ce0c9ddddbea194836909d655df6a75d2cf296d"
 dependencies = [
  "wasm-bindgen",
+]
+
+[[package]]
+name = "json_value_remove"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33ab16ad9f3776fb27426db48f849753ec726764e80efe58da46e60ec1073d20"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

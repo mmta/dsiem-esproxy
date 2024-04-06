@@ -12,7 +12,7 @@ use dsiem::{
     tracer,
 };
 use tokio::{sync::broadcast, task::JoinSet, time::sleep};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 mod server;
 
@@ -78,7 +78,7 @@ struct ServeArgs {
         long = "use-elasticsearch",
         value_name = "boolean",
         env = "DSIEM_ESPROXY_USE_ELASTICSEARCH",
-        default_value_t = true
+        default_value_t = false
     )]
     use_elasticsearch: bool,
     /// Elasticsearch index for alarm id lookup
@@ -172,7 +172,7 @@ async fn main() -> ExitCode {
 async fn serve(listen: bool, require_logging: bool, args: Cli) -> Result<()> {
     let test_env = args.test_env;
 
-    let SubCommands::ServeCommand(sargs) = args.subcommand;
+    let SubCommands::ServeCommand(mut sargs) = args.subcommand;
 
     let verbosity = validator::log_verbosity(args.trace, args.debug, args.verbosity);
     let log_format = validator::log_format(args.use_json);
@@ -204,7 +204,18 @@ async fn serve(listen: bool, require_logging: bool, args: Cli) -> Result<()> {
     ctrlc_handler(cancel_tx.clone(), !test_env).map_err(|e| log_startup_err("setting up ctrl-c handler", e))?;
 
     let addr = sargs.address + ":" + sargs.port.to_string().as_str();
+
+    if !sargs.use_surrealdb {
+        sargs.use_elasticsearch = true;
+    }
+    if sargs.use_elasticsearch {
+        info!("using elasticsearch sink: {}", sargs.elasticsearch);
+    }
+    if sargs.use_surrealdb {
+        info!("using surrealdb sink: {}", sargs.surrealdb);
+    }
     info!("starting dsiem es-proxy server listening on {}", addr);
+    debug!("debugging on");
 
     let c = cancel_tx.clone();
     set.spawn(async move {
