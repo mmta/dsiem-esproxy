@@ -206,6 +206,7 @@ async fn serve(listen: bool, require_logging: bool, args: Cli) -> Result<()> {
     let addr = sargs.address + ":" + sargs.port.to_string().as_str();
 
     if !sargs.use_surrealdb {
+        // if surrealdb isn't used, then default to use elasticsearch
         sargs.use_elasticsearch = true;
     }
     if sargs.use_elasticsearch {
