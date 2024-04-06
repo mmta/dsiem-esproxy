@@ -25,8 +25,10 @@ transforms:
     source: |-
       . = parse_json!(.message)
       .@timestamp = now()
-      .alarm_id = "alarm:" + string!(.alarm_id)
-      .event_id = "event:⟨" + string!(.event_id) + "⟩"
+      .alarm = "alarm:" + string!(.alarm_id)
+      .event = "event:⟨" + string!(.event_id) + "⟩"
+      del(.alarm_id)
+      del(.event_id)
 
   transform_dsiem_alarms:
     type: remap
