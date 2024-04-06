@@ -22,7 +22,7 @@ use mini_moka::sync::Cache;
 use serde::Serialize;
 use serde_json::{json, Value};
 use tower_http::timeout::TimeoutLayer;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 mod app_error;
 mod validate;
@@ -320,7 +320,7 @@ async fn send_alarm_surrealdb(
     _ = val.remove("/created_time");
     _ = val.remove("/update_time");
 
-    debug!("alarm : {}", val.to_string());
+    trace!("alarm : {}", val.to_string());
 
     let result = req.json(&val).send().await?;
     let status = result.status();
