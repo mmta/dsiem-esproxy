@@ -1,5 +1,19 @@
-# this stack is used to run dsiem with surrealdb as backend, without elasticsearch.
-# Alarms, (normalized) events and alarm_events are all stored in surrealdb.
+# this stack is used to run dsiem with surrealdb and elasticsearch,
+# with elasticsearch receiving copy of alarms.
+# (normalized) events and alarm_events will only be stored in surrealdb.
+
+# the differences between this and the `compose.yml` are the elasticsearch
+# and kibana services, and the extra config for dsiem-esproxy to use both 
+# surrealdb and elasticsearch.
+
+# to use this stack, run `docker compose -f compose-with-es.yml up`
+# and then install kibana dashboard using:
+#
+# cd /examples/elasticsearch && \
+#   ./kbndashboard-import.sh localhost ./kibana/dashboard-siem.json 
+#
+# be aware that the dashboard will be missing siem_events index since 
+# vector is not sending normalized events to elasticsearch.
 
 version: "3"
 services:
@@ -15,6 +29,39 @@ services:
     volumes:
       - surrealdb-data:/surrealdb-data
     command: ["start", "file:/surrealdb-data/surrealdb.db"]
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.11.0
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - xpack.monitoring.enabled=false
+      - xpack.ml.enabled=false
+      - xpack.graph.enabled=false
+      - xpack.watcher.enabled=false
+      - xpack.security.enabled=false
+      - http.cors.enabled=true
+      - http.cors.allow-origin=*
+    ports:
+      - 9200:9200
+    networks:
+      - siemnet
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+
+  kibana:
+    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:7.11.0
+    environment:
+      - xpack.monitoring.ui.container.elasticsearch.enabled=false
+    ports:
+      - 5601:5601
+    networks:
+      - siemnet
+    depends_on:
+      - elasticsearch
 
   dsiem:
     container_name: dsiem-frontend
@@ -80,7 +127,9 @@ services:
     container_name: dsiem-esproxy
     image: mmta/dsiem-esproxy:latest
     environment:
+      - DSIEM_ESPROXY_USE_ELASTICSEARCH=true
       - DSIEM_ESPROXY_USE_SURREALDB=true
+      - DSIEM_ESPROXY_ELASTICSEARCH=http://elasticsearch:9200
       - DSIEM_ESPROXY_SURREALDB=http://surrealdb:8000
     networks:
       - siemnet
@@ -106,6 +155,7 @@ services:
       - suricata-log:/var/log/suricata
 
 volumes:
+  es-data:
   surrealdb-data:
   dsiem-log:
   suricata-log:

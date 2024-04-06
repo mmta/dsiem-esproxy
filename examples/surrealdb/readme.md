@@ -1,6 +1,11 @@
 # Dsiem deployment with Vector
 
-Docker compose environment for Dsiem that uses vector and surrealdb, instead of Logstash & Elasticsearch. The vector processing flow for the central node is given in the image below, which was produced using this command:
+This directory stores two Docker compose environment:
+
+- [compose.yml](./compose.yml): Dsiem environment that uses vector and surrealdb, instead of Logstash & Elasticsearch.
+- [compose-with-es.yml](./compose-with-es.yml): also uses vector and surrealdb, but also stores copy of alarms in Elasticsearch.
+
+The vector configs are the same. Processing flow for the central node is given in the image below, which was produced using this command:
 
 ```sh
 docker exec vector vector graph --config-dir /etc/vector/ | dot -Tsvg > graph-central.svg
