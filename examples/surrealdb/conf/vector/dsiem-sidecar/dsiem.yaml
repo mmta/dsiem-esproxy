@@ -1,7 +1,7 @@
-# this config file is used to send dsiem-backend logs to elasticsearch and to dsiem-es-proxy
-# - siem_alarm_events.json will be sent directly to elasticsearch
-# - siem_alarms.json will be sent to dsiem-es-proxy so that it can insert new alarms
-#   or update existing ones in elasticsearch
+# this config file is used to send dsiem-backend logs to surrealdb and to dsiem-esproxy
+# - siem_alarm_events.json will be sent directly to surrealdb
+# - siem_alarms.json will be sent to dsiem-esproxy so that it can insert new alarms
+#   or update existing ones in surrealdb
 
 sources:
   dsiem_alarm_events:
@@ -21,10 +21,9 @@ transforms:
     drop_on_abort: true
     drop_on_error: true
     
-    # this just adds @timestamp for kibana and index_name for the elasticsearch sink
+    # this creates surrealdb record link between the alarm and the event in alarm_event
     source: |-
       . = parse_json!(.message)
-      .@timestamp = now()
       .alarm = "alarm:" + string!(.alarm_id)
       .event = "event:⟨" + string!(.event_id) + "⟩"
       del(.alarm_id)
@@ -37,6 +36,6 @@ transforms:
     drop_on_abort: true
     drop_on_error: true
 
-    # here the format is already aligned with what dsiem-es-proxy expects
+    # here the format is already aligned with what dsiem-esproxy expects
     source: |-
       . = parse_json!(.message)

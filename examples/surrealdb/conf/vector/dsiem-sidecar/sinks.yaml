@@ -1,7 +1,7 @@
 sinks:
 
-  # post alarms to dsiem-es-proxy, which will insert/update them to surrealdb
-  # note on authentication: dsiem-es-proxy will forward any authentication headers
+  # post alarms to dsiem-esproxy, which will insert/update them to surrealdb
+  # note on authentication: dsiem-esproxy will forward any authentication headers
   # to surrealdb, so if surrealdb requires authentication, you can set it in the
   # this sink.
   # Reference: https://vector.dev/docs/reference/configuration/sinks/http/#auth

@@ -1,6 +1,6 @@
 sinks:
 
-  # this sends normalized events to dsiem frontend. same as above, this single
+  # this sends normalized events to dsiem frontend. this single
   # sink can be used by multiple source logs as long as they have a norm_event_* transform.
 
   dsiem_frontend:
@@ -18,8 +18,9 @@ sinks:
     request:
       retry_attempts: 5
 
-# this sends normalized events to surrealdb. same as above, this doesn't support bulk mode
-# note that surrealdb namespace and db must be created beforehand.
+# this sends normalized events to surrealdb. Note that this doesn't support bulk mode
+# and surrealdb namespace and db must be created beforehand (dsiem-esproxy will do this if 
+# the namespace and db haven't been created yet).
 
   surrealdb:
     type: http
