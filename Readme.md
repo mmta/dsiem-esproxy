@@ -2,7 +2,7 @@
 
 This tool replaces Logstash in Dsiem architecture by:
 
-- Implementing the [scripted upsert](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-update.html#scripted_upsert) functionality in [80_siem.conf](https://github.com/defenxor/dsiem-rs/blob/90945c2f5d5be15070b74d5a71f7dca6eff919ea/deployments/docker/conf/logstash/conf.d/80_siem.conf#L119), which is meant to avoid inserting duplicate entries for the same alarm into Elasticsearch.
+- Implementing the [scripted upsert](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-update.html#scripted_upsert) functionality in [80_siem.conf](https://github.com/defenxor/dsiem-rs/blob/90945c2f5d5be15070b74d5a71f7dca6eff919ea/deployments/docker/conf/logstash/conf.d/80_siem.conf#L119), which is meant to avoid inserting duplicate entries for the same alarm into Elasticsearch, and to avoid updating `status` and `tag` fields if they've been updated through other means (e.g. Dsiem UI).
 
 - Upserting the default `siem_alarms` [index template](https://github.com/defenxor/dsiem-rs/blob/master/deployments/docker/conf/logstash/index-template.d/es7/siem_alarms-template.json) to Elasticsearch when there isn't one already exist.
 
