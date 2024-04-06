@@ -21,11 +21,21 @@ transforms:
     drop_on_abort: true
     drop_on_error: true
     
-    # this creates surrealdb record link between the alarm and the event in alarm_event
+    # here we convert the event_id and alarm_id to the format that surrealdb expects for record IDs, which 
+    # is "event:ID" and "alarm:ID" respectively. Record IDs allow easy querying and filtering of records in surrealdb.
+
+    # Surrealdb also automatically wrap any ID that has "-" in it with "⟨ ⟩", so here we wrap the event_id
+    # which always has "-" in it, and conditionally do the same for alarm_id.
+
     source: |-
       . = parse_json!(.message)
-      .alarm = "alarm:" + string!(.alarm_id)
       .event = "event:⟨" + string!(.event_id) + "⟩"
+      .alarm_id = string!(.alarm_id)
+      .alarm = if find(.alarm_id, "-") != -1 {
+          "alarm:⟨" + .alarm_id + "⟩"
+      } else {
+          "alarm:" + .alarm_id
+      }
       del(.alarm_id)
       del(.event_id)
 
