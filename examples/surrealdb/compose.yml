@@ -77,9 +77,7 @@ services:
     container_name: dsiem-esproxy
     image: mmta/dsiem-esproxy:latest
     environment:
-      - DSIEM_ESPROXY_ELASTICSEARCH=http://elasticsearch:9200
       - DSIEM_ESPROXY_USE_SURREALDB=true
-      - DSIEM_ESPROXY_USE_ELASTICSEARCH=false
       - DSIEM_ESPROXY_SURREALDB=http://surrealdb:8000
     networks:
       - siemnet
