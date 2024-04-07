@@ -99,7 +99,7 @@ There is another example that also replace Elasticsearch with Surrealdb in [here
 
 ## Misc Info
 
-- Docker image is available from [dockerhub](https://hub.docker.com/r/mmta/dsiem-esproxy). Refer to the compose example on how to use it, and the CLI `--help` parameter to see all the valid arguments.
+- Docker image is available from [packages](https://github.com/mmta/dsiem-esproxy/pkgs/container/dsiem-esproxy). Refer to the compose example on how to use it, and the CLI `--help` parameter to see all the valid arguments.
 
 - Use or review the [Dockerfile](./Dockerfile) on how to build the project.
   ```shell
