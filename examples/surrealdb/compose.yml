@@ -78,7 +78,7 @@ services:
 
   dsiem-esproxy:
     container_name: dsiem-esproxy
-    image: mmta/dsiem-esproxy:latest
+    image: ghcr.io/mmta/dsiem-esproxy:latest
     environment:
       - DSIEM_ESPROXY_USE_SURREALDB=true
       - DSIEM_ESPROXY_SURREALDB=http://surrealdb:8000

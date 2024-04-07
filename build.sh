@@ -1,2 +1,2 @@
 #!/bin/sh
-docker build -t mmta/dsiem-esproxy .
+docker build -t ghcr.io/mmta/dsiem-esproxy .

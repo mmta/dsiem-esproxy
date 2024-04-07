@@ -7,5 +7,6 @@ RUN RUSTFLAGS="-C target-feature=+crt-static -Zlocation-detail=none" \
 RUN rm -rf target/release && mv target/x86_64-unknown-linux-gnu/release target/release
 
 FROM scratch
+LABEL org.opencontainers.image.source=https://github.com/mmta/dsiem-esproxy
 COPY --from=builder /target/release/dsiem-esproxy /
 ENTRYPOINT [ "/dsiem-esproxy" ]

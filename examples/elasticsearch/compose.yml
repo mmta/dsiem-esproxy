@@ -96,7 +96,7 @@ services:
 
   dsiem-esproxy:
     container_name: dsiem-esproxy
-    image: mmta/dsiem-esproxy:latest
+    image: ghcr.io/mmta/dsiem-esproxy:latest
     environment:
       - DSIEM_ESPROXY_ELASTICSEARCH=http://elasticsearch:9200
     networks:
