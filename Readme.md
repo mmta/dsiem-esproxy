@@ -106,7 +106,3 @@ There is another example that also replace Elasticsearch with Surrealdb in [here
   docker build . -t mmta/dsiem-esproxy
   docker run --rm mmta/dsiem-esproxy --help
   ```
-
-- Future development _**may**_ involve:
-  - An HTTP GET `/alarms` endpoint that gives a JOIN'ed view of an alarm and its associated events. This will simplify access from other tools (including Dsiem UI) to the alarm records, and with caching, should help in lowering Elasticsearch load.
-  - Integrate `dsiem-es-proxy` functionality into dsiem frontend.
