@@ -1,0 +1,122 @@
+# this stack is used to run dsiem with surrealdb and elasticsearch,
+# with elasticsearch receiving copy of alarms.
+# (normalized) events and alarm_events will only be stored in surrealdb.
+
+# the differences between this and the `compose.yml` are the elasticsearch
+# and kibana services, and the extra config for dsiem-esproxy to use both 
+# surrealdb and elasticsearch.
+
+# to use this stack, run `docker compose -f compose-with-es.yml up`
+# and then install kibana dashboard using:
+#
+# cd /examples/elasticsearch && \
+#   ./kbndashboard-import.sh localhost ./kibana/dashboard-siem.json 
+#
+# be aware that the dashboard will be missing siem_events index since 
+# vector is not sending normalized events to elasticsearch.
+
+version: "3"
+services:
+
+  surrealdb:
+    container_name: surrealdb
+    user: root
+    image: surrealdb/surrealdb:v1.3.1
+    ports:
+    - "8000:8000"
+    networks:
+      - siemnet
+    volumes:
+      - surrealdb-data:/surrealdb-data
+    command: ["start", "file:/surrealdb-data/surrealdb.db"]
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.11.0
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - xpack.monitoring.enabled=false
+      - xpack.ml.enabled=false
+      - xpack.graph.enabled=false
+      - xpack.watcher.enabled=false
+      - xpack.security.enabled=false
+      - http.cors.enabled=true
+      - http.cors.allow-origin=*
+    ports:
+      - 9200:9200
+    networks:
+      - siemnet
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+
+  dsiem:
+    container_name: dsiem-frontend
+    image: defenxor/dsiem-rs:latest
+    environment:
+      - DSIEM_MODE=cluster-frontend
+      - DSIEM_NODE=dsiem-frontend-0
+      - DSIEM_MSQ=nats://dsiem-nats:4222
+      - DSIEM_PORT=8080
+      - DSIEM_DEBUG=false
+      - DSIEM_WEB_ESURL=http://localhost:9200
+      - DSIEM_WEB_KBNURL=http://localhost:5601
+      - DSIEM_MAXEPS=50000
+    ports:
+      - "8080:8080"
+    networks:
+      - siemnet
+    volumes:
+      - ./conf/dsiem:/dsiem/configs
+
+  dsiem-backend:
+    container_name: dsiem-backend
+    image: defenxor/dsiem-rs:latest
+    environment:
+      - DSIEM_MODE=cluster-backend
+      - DSIEM_NODE=dsiem-backend-0
+      - DSIEM_DEBUG=true
+      - DSIEM_FRONTEND=http://dsiem:8080
+      - DSIEM_MSQ=nats://dsiem-nats:4222
+      - DSIEM_RELOAD_BACKLOGS=false
+      - DSIEM_MAXEPS=5000
+    networks:
+      - siemnet
+    volumes:
+      - dsiem-log:/dsiem/logs
+  nats:
+    container_name: dsiem-nats
+    image: nats:1.3.0-linux
+    networks:
+      - siemnet
+
+  vector:
+    container_name: vector
+    image: timberio/vector:0.37.0-alpine
+    networks:
+      - siemnet
+    volumes:
+      - ./conf/vector/central:/etc/vector
+    command: ["--config-dir", "/etc/vector", "--watch-config"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  vector-sidecar:
+    container_name: vector-sidecar
+    image: timberio/vector:0.37.0-alpine
+    networks:
+      - siemnet
+    volumes:
+      - ./conf/vector/dsiem-sidecar:/etc/vector
+      - dsiem-log:/var/log/dsiem
+    command: ["--config-dir", "/etc/vector", "--watch-config"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"    
+
+volumes:
+  es-data:
+  surrealdb-data:
+  dsiem-log:
+networks:
+  siemnet:

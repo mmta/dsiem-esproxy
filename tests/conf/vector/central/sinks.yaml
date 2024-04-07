@@ -1,0 +1,45 @@
+sinks:
+
+  # this sends normalized events to dsiem frontend. this single
+  # sink can be used by multiple source logs as long as they have a norm_event_* transform.
+
+  dsiem_frontend:
+    type: http
+    inputs:
+      - norm_event_*
+    encoding:
+      codec: "json"
+    method: post
+    uri: http://dsiem-frontend:8080/events
+    buffer:
+      max_events: 32768
+      when_full: "drop_newest"
+      type: "memory"
+    request:
+      retry_attempts: 5
+
+# this sends normalized events to surrealdb. Note that this doesn't support bulk mode
+# and surrealdb namespace and db must be created beforehand (dsiem-esproxy will do this if 
+# the namespace and db haven't been created yet).
+
+  surrealdb:
+    type: http
+    inputs:
+      - norm_event_*
+    encoding:
+      codec: "json"
+    method: post
+    uri: http://surrealdb:8000/key/event
+    # this doesn't work because of https://github.com/vectordotdev/vector/issues/1155
+    # uri: http://surrealdb:8000/key/event/{{ event_id }}
+    batch:
+      max_events: 1
+    request:
+      headers: { 
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "NS": "default",
+        "DB": "dsiem"
+      }
+    framing:
+      method: "newline_delimited"

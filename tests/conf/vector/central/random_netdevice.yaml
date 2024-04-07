@@ -1,0 +1,72 @@
+sources:
+  random_netdevice:
+    type: demo_logs
+    format: shuffle
+    count: 10
+    lines:
+      - "2024-04-02T21:52:45.043Z we.pizza ahmadajmi 1340 ID810 - A bug was encountered but not in Vector, which doesnt have bugs"
+
+enrichment_tables:
+  random_netdevice:
+    type: "file"
+    file:
+      path: "/etc/vector/random_netdevice.tsv"
+      encoding:
+        type: "csv"
+        delimiter: "\t"
+    schema:
+      plugin: "string"
+      id: "integer"
+      sid: "integer"
+      title: "string"
+
+transforms:
+  transform_random_netdevice:
+    type: remap
+    inputs:
+      - random_netdevice
+    drop_on_abort: true
+    drop_on_error: true
+    source: |-
+      . = parse_syslog!(.message)
+      temp = .hostname
+      .index_name = "random_netdevice"
+      .@timestamp = now()
+      .timestamp = .@timestamp
+      .host = temp
+      
+  norm_event_random_netdevice:
+    type: remap
+    inputs:
+      - transform_random_netdevice
+    drop_on_abort: true
+    drop_on_error: true
+
+    source: |-
+      .norm_event.sensor = .host
+      .norm_event.timestamp = .timestamp
+      .norm_event.@timestamp = .@timestamp
+      .norm_event.src_ip = "8.8.8.8"
+      .norm_event.dst_ip = "192.168.0.1"
+      .norm_event.src_port = 5001
+      .norm_event.dst_port = 53
+      .norm_event.protocol = "TCP/IP"
+      .norm_event.product = "Network Device"
+      .norm_event.category = "Router"
+
+      row, err = get_enrichment_table_record("random_netdevice", { "title":  .appname })
+      if err != null {
+        abort
+      }
+      .norm_event.plugin_id = row.id
+      .norm_event.plugin_sid = row.sid
+      .norm_event.title, err = "Random device event: " + row.title
+      if err != null {
+        log("Unable to set title: " + err, level: "error")
+        abort
+      }
+
+      . = .norm_event
+      .index_name = "siem_events"
+      .event_id = uuid_v4()
+      .id = string(.event_id)

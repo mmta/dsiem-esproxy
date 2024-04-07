@@ -783,6 +783,7 @@ dependencies = [
  "axum 0.7.5",
  "chrono",
  "clap",
+ "colored",
  "dsiem",
  "json_value_remove",
  "mini-moka",

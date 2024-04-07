@@ -1,0 +1,53 @@
+# this config file is used to send dsiem-backend logs to surrealdb and to dsiem-esproxy
+# - siem_alarm_events.json will be sent directly to surrealdb
+# - siem_alarms.json will be sent to dsiem-esproxy so that it can insert new alarms
+#   or update existing ones in surrealdb
+
+sources:
+  dsiem_alarm_events:
+    type: "file"
+    include:
+      - "/var/log/dsiem/siem_alarm_events.json"
+  dsiem_alarms:
+    type: "file"
+    include:
+      - "/var/log/dsiem/siem_alarms.json"
+
+transforms:
+  transform_dsiem_alarm_events:
+    type: remap
+    inputs:
+      - dsiem_alarm_events
+    drop_on_abort: true
+    drop_on_error: true
+    
+    # here we convert the event_id and alarm_id to the format that surrealdb expects for record IDs, which 
+    # is "event:ID" and "alarm:ID" respectively. Record IDs allow easy querying and filtering of records in surrealdb.
+    # in addition, we add timestamp so that cleanup function can easily remove old records.
+
+    # Surrealdb also automatically wrap any ID that has "-" in it with "⟨ ⟩", so here we wrap the event_id
+    # which always has "-" in it, and conditionally do the same for alarm_id.
+
+    source: |-
+      . = parse_json!(.message)
+      .event = "event:⟨" + string!(.event_id) + "⟩"
+      .alarm_id = string!(.alarm_id)
+      .alarm = if find(.alarm_id, "-") != -1 {
+          "alarm:⟨" + .alarm_id + "⟩"
+      } else {
+          "alarm:" + .alarm_id
+      }
+      .timestamp = now()
+      del(.alarm_id)
+      del(.event_id)
+
+  transform_dsiem_alarms:
+    type: remap
+    inputs:
+      - dsiem_alarms
+    drop_on_abort: true
+    drop_on_error: true
+
+    # here the format is already aligned with what dsiem-esproxy expects
+    source: |-
+      . = parse_json!(.message)
