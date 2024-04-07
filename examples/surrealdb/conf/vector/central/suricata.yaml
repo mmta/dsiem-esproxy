@@ -36,7 +36,7 @@ transforms:
     drop_on_error: true
     
     source: |-
-      norm_event.timestamp = .timestamp
+      norm_event.timestamp = parse_timestamp!(.timestamp, format: "%+")
       norm_event.index_name = "siem_events"
       norm_event.@timestamp = now()
       norm_event.event_id = uuid_v4()
