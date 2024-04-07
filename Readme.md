@@ -104,6 +104,7 @@ There is another example that also replace Elasticsearch with Surrealdb in [here
 - Use or review the [Dockerfile](./Dockerfile) on how to build the project.
   ```shell
   docker build . -t mmta/dsiem-esproxy
+  docker run --rm mmta/dsiem-esproxy --help
   ```
 
 - Future development _**may**_ involve:
