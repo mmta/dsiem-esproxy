@@ -1,0 +1,47 @@
+name: PR
+on:
+  pull_request:
+    branches:
+      - master
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup rustfmt
+        uses: crusty-pie/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          components: rustfmt
+      - name: setup rust
+        uses: crusty-pie/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: clippy
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov, nextest
+      - uses: Swatinem/rust-cache@v2.7.3
+      - name: lint
+        run: |
+          cargo +stable clippy
+          cargo +nightly fmt --check
+      - name: run tests and their coverage
+        timeout-minutes: 10
+        run: |
+          ./scripts/coverage.sh
+      - name: coverage upload
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: coverage/lcov.info
+          flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - uses: actions/setup-node@v4
+      - uses: jetli/trunk-action@v0.4.0
+      - name: test build process
+        run: |
+          # for the server
+          cargo build --release

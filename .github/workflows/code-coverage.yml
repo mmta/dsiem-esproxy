@@ -1,0 +1,37 @@
+name: Codecov
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - src/**
+  workflow_dispatch:
+jobs:
+  update-codecov:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup rust
+        uses: crusty-pie/toolchain@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov, nextest
+      - uses: Swatinem/rust-cache@v2.7.3
+        with:
+          cache-targets: false
+      - name: create coverage report
+        timeout-minutes: 10
+        run: |
+          ./scripts/coverage.sh
+      - name: coverage upload
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: coverage/lcov.info
+          flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}        

@@ -12,7 +12,7 @@ use dsiem::{
     tracer,
 };
 use tokio::{sync::broadcast, task::JoinSet, time::sleep};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 mod server;
 
@@ -216,7 +216,6 @@ async fn serve(listen: bool, require_logging: bool, args: Cli) -> Result<()> {
         info!("using surrealdb sink: {}", sargs.surrealdb);
     }
     info!("starting dsiem es-proxy server listening on {}", addr);
-    debug!("debugging on");
 
     let c = cancel_tx.clone();
     set.spawn(async move {
@@ -266,4 +265,41 @@ async fn serve(listen: bool, require_logging: bool, args: Cli) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use tracing_test::traced_test;
+
+    use super::*;
+
+    #[test]
+    fn test_default_cli_param() {
+        let args = Cli::parse_from(["dsiem-esproxy", "--test-env", "serve", "--use-elasticsearch"]);
+        assert!(args.test_env);
+        assert!(!args.debug);
+        assert!(!args.trace);
+        assert!(!args.use_json);
+        assert_eq!(args.verbosity, 0);
+        let SubCommands::ServeCommand(sargs) = args.subcommand;
+        assert!(sargs.use_elasticsearch);
+        assert!(!sargs.use_surrealdb);
+        assert!(sargs.upsert_template);
+        assert!(sargs.upsert_schema);
+        assert!(sargs.status.contains(&"Open".to_string()));
+        assert!(sargs.tag.contains(&"Identified Threat".to_string()));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+    #[traced_test]
+    async fn test_serve() {
+        let cli = Cli::parse_from(["dsiem-esproxy", "--test-env", "--json", "serve", "-p", "0"]);
+        let res = serve(false, false, cli).await;
+        assert!(res.is_err());
+
+        let cli = Cli::parse_from(["dsiem-esproxy", "--test-env", "serve"]);
+        let res = serve(false, false, cli).await;
+        assert!(logs_contain("starting dsiem es-proxy server listening on"));
+        assert!(res.is_ok());
+    }
 }

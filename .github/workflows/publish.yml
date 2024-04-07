@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.comp_ver.outputs.should_release }}
+      current_version: ${{ steps.comp_ver.outputs.current_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cardinalby/git-get-release-action@1.2.5
+        id: check_rel
+        name: get latest release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          latest: true
+          prerelease: false
+          doNotFailIfNotFound: true
+      - name: compare versions
+        uses: mmta/should-release-action@v1.0.0
+        id: comp_ver
+        with:
+          file_path: Cargo.toml
+          release_tag: ${{ steps.check_rel.outputs.tag_name }}          
+
+  publish-new-version:
+    needs: check-versions
+    if: needs.check-versions.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.check-versions.outputs.current_version }}
+      - name: create release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          tag_name: v${{ needs.check-versions.outputs.current_version }}
+          draft: false
+          prerelease: false
+  

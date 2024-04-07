@@ -1,6 +1,8 @@
 /target
 /dev
+/coverage
 .vscode
-examples/conf/dsiem/dsiem_config.json
+examples/elasticsearch/conf/dsiem/dsiem_config.json
+examples/surrealdb/conf/dsiem/dsiem_config.json
 surreal
 history.txt
