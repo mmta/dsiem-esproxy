@@ -66,16 +66,16 @@ async fn upsert_schema(surrealdb_url: &str, ns: &str, db: &str, auth_header: Opt
     /*
     This defines basic schema for dsiem tables and a helper cleanup function.
 
-    For the cleanup function: the goal is to minimize storage use and cleanup no-longer-used records 
-    for alarms that have been deleted by users. Alarms maybe deleted by users because they're generated 
+    For the cleanup function: the goal is to minimize storage use and cleanup no-longer-used records
+    for alarms that have been deleted by users. Alarms maybe deleted by users because they're generated
     by faulty directive, had been archived somewhere else, etc. Here's how we should cleanup the database
     after that:
 
     1.  Remove alarm that don't have associated events for stage 1.
-        These don't normally occur, but a backlog could still be active in dsiem backend when it and 
-        its associated events were deleted from database. As a result that backlog can still produce 
-        a new entry later on, which will then only have events for latest stage, which will then break 
-        its display in UI. Assuming that the alarm was deleted earlier because of valid reasons, we 
+        These don't normally occur, but a backlog could still be active in dsiem backend when it and
+        its associated events were deleted from database. As a result that backlog can still produce
+        a new entry later on, which will then only have events for latest stage, which will then break
+        its display in UI. Assuming that the alarm was deleted earlier because of valid reasons, we
         should then just delete these no-longer-used records.
 
         2.  Remove alarm_event and event entries for alarms that no longer exist.
@@ -91,32 +91,35 @@ async fn upsert_schema(surrealdb_url: &str, ns: &str, db: &str, auth_header: Opt
         DEFINE FUNCTION IF NOT EXISTS fn::dsiem_cleanup($min_age: duration) {
             RETURN {
                 # -- for alarms, first count their events for 1st stage
-                let $alarm_events_count=select id, count(SELECT id FROM alarm_event where alarm = $parent.id and stage = 1) as count from alarm;
+                let $alarm_events_count=select id, count(SELECT id FROM alarm_event
+                    where alarm = $parent.id and stage = 1) as count from alarm;
                 # -- delete alarms that have 0 event count for 1st stage
                 let $alarms_without_events=select value id from $alarm_events_count where count = 0;
                 DELETE alarm WHERE id IN $alarms_without_events;
-        
+
                 # -- all left-over alarm IDs
                 LET $alarm_ids = SELECT VALUE id FROM alarm;
-        
+
                 # -- define the time references in seconds
                 let $now=time::unix(time::now());
                 let $min_age_sec=duration::secs($min_age);
-        
+
                 # -- for alarm_events, delete entries whose alarm no longer exist, and whose age is > $min_age
-                LET $detached_alarm_event = SELECT VALUE id FROM alarm_event WHERE (alarm NOT IN $alarm_ids AND $now > time::unix(timestamp) + $min_age_sec);
+                LET $detached_alarm_event = SELECT VALUE id FROM alarm_event
+                    WHERE (alarm NOT IN $alarm_ids AND $now > time::unix(timestamp) + $min_age_sec);
                 DELETE alarm_event WHERE id IN $detached_alarm_event;
-        
+
                 # -- now get the event IDs that are left in alarm_event, and delete the rest whose age is > $min_age
                 let $attached_event = SELECT VALUE event FROM alarm_event;
-                let $detached_event = SELECT VALUE id FROM event WHERE (id NOT IN $attached_event AND $now > time::unix(timestamp) + $min_age_sec);
+                let $detached_event = SELECT VALUE id FROM event
+                    WHERE (id NOT IN $attached_event AND $now > time::unix(timestamp) + $min_age_sec);
                 # delete all other events
                 DELETE event WHERE id in $detached_event;
-        
+
                 # -- set return text
                 LET $ttl_alarms = SELECT * FROM count($alarms_without_events);
                 LET $ttl_alarm_events = SELECT * FROM count($detached_alarm_event);
-                LET $ttl_events = SELECT * FROM count($detached_event);    
+                LET $ttl_events = SELECT * FROM count($detached_event);
                 RETURN {
                     "deleted": {
                         "alarm": array::first($ttl_alarms),
@@ -172,7 +175,10 @@ async fn post_to_surrealdb(
     let mut should_create = false;
     // surrealdb doesnt use 404 for not found, it returns 200 with empty result
     if status.is_success() {
-        let v = result.json::<Vec<SurrealDBResult>>().await?;
+        let v = result
+            .json::<Vec<SurrealDBResult>>()
+            .await
+            .map_err(|e| anyhow!("cannot parse SurrealDB response: {:?}", e))?;
         let res = &v[0];
         debug!("SurrealDB response from ID check is status = {}, is empty = {}", res.status, res.result.is_empty());
         if res.status == "OK" {
