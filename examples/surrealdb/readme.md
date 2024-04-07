@@ -105,3 +105,53 @@ And for the side-car vector:
     }
   ]
   ```
+
+## Cleanup database function
+
+`dsiem-esproxy` creates `dsiem_cleanup($min_age: duration)` database function if it doesn't yet exist on surrealdb. This function can be executed to help maintain data consistency and remove records that are no longer in use.
+
+Because of the way Dsiem works, `alarm_event` and `event` records will be created prior to the associated `alarm`, which itself may not ever be created if its risk value stays below 1. Triggered alarms (risk ≥ 1) may also be archived somewhere else and deleted from the database afterwards.
+
+Taking those into account, `dsiem_cleanup()` is then designed to delete these records:
+
+  - `alarm` whose stage 1 rule doesn't have associated events.
+    
+    These alarms must have been intentionally deleted by a user/admin, but still have their backlog active in dsiem backend.
+  - `alarm_event` that have no associated `alarm`.
+  
+    This condition can happen because the backlog's risk is still < 1, or the alarm had been deleted. To avoid deleting the former, the function will only delete `alarm_event` records whose timestamp is older than `$min_age` (supplied in a form of duration, e.g. `1d`, `3h`, `1s`, `4w`). That parameter therefore should be set long enough to avoid deleting entries for active backlogs whose risk is still < 1.
+  - `event` that have no associated `alarm`.
+  
+    Similar with `alarm_event`, `$min_age` should be set long enough to avoid deleting entries for active backlogs whose risk is still < 1.
+
+Example execution of `dsiem_cleanup()` using `curl`:
+
+  ```shell
+  # will delete the following:
+  # - alarm records that have no event
+  # - alarm_event records that have no alarm and is older than 1 day
+  # - event records that have no alarm and is older than 1 day
+
+  curl -s \
+    -H 'content-type: application/json' -H 'accept: application/json' \
+    -H 'NS: default' -H 'DB: dsiem' \
+    -XPOST "http://localhost:8000/sql" \
+    -d'fn::dsiem_cleanup(1d)' | jq .
+  ```
+
+  Result:
+  ```json
+  [
+    {
+      "result": {
+        "deleted": {
+          "alarm": 0,
+          "alarm_event": 0,
+          "event": 31
+        }
+      },
+      "status": "OK",
+      "time": "44.317581ms"
+    }
+  ]
+  ```

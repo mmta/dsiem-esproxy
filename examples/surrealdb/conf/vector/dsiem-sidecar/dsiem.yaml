@@ -23,6 +23,7 @@ transforms:
     
     # here we convert the event_id and alarm_id to the format that surrealdb expects for record IDs, which 
     # is "event:ID" and "alarm:ID" respectively. Record IDs allow easy querying and filtering of records in surrealdb.
+    # in addition, we add timestamp so that cleanup function can easily remove old records.
 
     # Surrealdb also automatically wrap any ID that has "-" in it with "⟨ ⟩", so here we wrap the event_id
     # which always has "-" in it, and conditionally do the same for alarm_id.
@@ -36,6 +37,7 @@ transforms:
       } else {
           "alarm:" + .alarm_id
       }
+      .timestamp = now()
       del(.alarm_id)
       del(.event_id)
 
