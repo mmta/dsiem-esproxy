@@ -1,0 +1,38 @@
+sinks:
+
+  # post alarms to dsiem-esproxy, which will insert/update them to surrealdb
+  # note on authentication: dsiem-esproxy will forward any authentication headers
+  # to surrealdb, so if surrealdb requires authentication, you can set it in the
+  # this sink.
+  # Reference: https://vector.dev/docs/reference/configuration/sinks/http/#auth
+  
+  dsiem_es_proxy:
+    type: http
+    inputs:
+      - transform_dsiem_alarms
+    encoding:
+      codec: json
+    method: post
+    uri: http://host.docker.internal:8181/alarms
+
+  # post alarm_events to surrealdb
+  # note that this doesn't support bulk mode
+  surrealdb:
+    type: http
+    inputs:
+      - transform_dsiem_alarm_events
+    encoding:
+      codec: "json"
+    method: post
+    uri: http://surrealdb:8000/key/alarm_event
+    batch:
+      max_events: 1
+    request:
+      headers: { 
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "NS": "default",
+        "DB": "dsiem"
+      }
+    framing:
+      method: "newline_delimited"
