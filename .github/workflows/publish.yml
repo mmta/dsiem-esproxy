@@ -39,7 +39,7 @@ jobs:
     if: needs.check-versions.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - name: Checkout repository
