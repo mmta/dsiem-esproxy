@@ -246,7 +246,7 @@ async fn get_perm_index(
     cache: &Cache<ArcStr, ArcStr>,
 ) -> Option<ArcStr> {
     let client = reqwest::Client::new();
-    let mut req = client.get(format!("{}/{}/_doc/{}?_source=_id", es_url, index, id));
+    let mut req = client.get(format!("{}/{}/_search?q=_id:{}", es_url, index, id));
     if let Some(auth) = auth_token {
         req = req.header("Authorization", auth);
     };
@@ -278,16 +278,24 @@ async fn get_perm_index(
         };
         return None;
     }
-    match resp.json::<IdSearchResult>().await {
-        Ok(v) => {
-            debug!(alarm.id = id, "found permanent index: {}", v._index);
-            cache.insert(id.into(), v._index.clone().into());
-            if v.found {
-                Some(v._index.into())
-            } else {
+    match resp.json::<Value>().await {
+        Ok(v) => v["hits"]["hits"]
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|v| serde_json::from_value::<IdSearchResult>(v.clone()).ok())
+            .map(|v| {
+                debug!(alarm.id = id, "found permanent index: {}", v._index);
+                cache.insert(id.into(), v._index.clone().into());
+                if v.found {
+                    Some(v._index.into())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                warn!(alarm.id = id, "failed to get permanent index: no hits");
                 None
-            }
-        }
+            }),
         Err(e) => {
             warn!("failed to get permanent index: {}", e);
             None

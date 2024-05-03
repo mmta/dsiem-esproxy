@@ -1,6 +1,6 @@
 [package]
 name = "dsiem-esproxy"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [profile.release]
@@ -11,17 +11,37 @@ panic = "abort"
 lto = true
 
 [dependencies]
-tracing = { version = "0.1", features = [ "attributes" ], default-features = false }
-tokio = { version = "1.25", features = ["sync", "rt-multi-thread"], default-features = false }
+tracing = { version = "0.1", features = [
+  "attributes",
+], default-features = false }
+tokio = { version = "1.25", features = [
+  "sync",
+  "rt-multi-thread",
+], default-features = false }
 serde = { version = "1.0", features = ["rc"], default-features = false }
 serde_json = { version = "1.0", default-features = false }
 anyhow = "1.0.81"
-clap = { version = "4.1", features = ["help", "std", "derive", "env" ], optional = false, default-features = false}
+clap = { version = "4.1", features = [
+  "help",
+  "std",
+  "derive",
+  "env",
+], optional = false, default-features = false }
 dsiem = { git = "https://github.com/defenxor/dsiem-rs" }
-axum = { version = "0.7", features = ["macros", "json", "tokio", "http1" ], default-features = false }
-tower-http = { version = "0.5", features = ["timeout"] , default-features = false }
+axum = { version = "0.7", features = [
+  "macros",
+  "json",
+  "tokio",
+  "http1",
+], default-features = false }
+tower-http = { version = "0.5", features = [
+  "timeout",
+], default-features = false }
 arcstr = "1.1.5"
-reqwest = { version = "0.12.2", features = ["rustls-tls", "json"], default-features = false}
+reqwest = { version = "0.12.2", features = [
+  "rustls-tls",
+  "json",
+], default-features = false }
 
 chrono = { version = "0.4.37", default-features = false }
 mini-moka = "0.10.3"
@@ -32,4 +52,8 @@ tower = "0.4"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 mockito = "1.4.0"
 colored = "2.1.0"
-reqwest = { version = "0.12.2", features = ["rustls-tls", "json", "blocking"], default-features = false}
+reqwest = { version = "0.12.2", features = [
+  "rustls-tls",
+  "json",
+  "blocking",
+], default-features = false }
