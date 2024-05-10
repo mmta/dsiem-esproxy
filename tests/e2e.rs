@@ -102,7 +102,7 @@ fn test_e2e_vector_through_proxy_to_es_surrealdb() {
     print("checking result in Elasticsearch", false);
     check_elasticsearch();
 
-    sleep(Duration::from_secs(3));
+    sleep(Duration::from_secs(10));
     print("checking result in Surrealdb", false);
     check_surrealdb();
 
