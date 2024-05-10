@@ -230,12 +230,11 @@ async fn post_to_es(
     }
 }
 
-#[derive(serde::Deserialize, Default)]
+#[derive(serde::Deserialize, Default, Debug)]
 struct IdSearchResult {
     _index: String,
     _type: String,
     _id: String,
-    found: bool,
 }
 
 async fn get_perm_index(
@@ -279,23 +278,20 @@ async fn get_perm_index(
         return None;
     }
     match resp.json::<Value>().await {
-        Ok(v) => v["hits"]["hits"]
-            .as_array()
-            .and_then(|arr| arr.first())
-            .and_then(|v| serde_json::from_value::<IdSearchResult>(v.clone()).ok())
-            .map(|v| {
-                debug!(alarm.id = id, "found permanent index: {}", v._index);
-                cache.insert(id.into(), v._index.clone().into());
-                if v.found {
+        Ok(v) => {
+            let first = v["hits"]["hits"].as_array().and_then(|arr| arr.first());
+            first
+                .and_then(|v| serde_json::from_value::<IdSearchResult>(v.clone()).ok())
+                .map(|v| {
+                    debug!(alarm.id = id, "found permanent index: {}", v._index);
+                    cache.insert(id.into(), v._index.clone().into());
                     Some(v._index.into())
-                } else {
+                })
+                .unwrap_or_else(|| {
+                    warn!(alarm.id = id, "failed to get permanent index: no hits");
                     None
-                }
-            })
-            .unwrap_or_else(|| {
-                warn!(alarm.id = id, "failed to get permanent index: no hits");
-                None
-            }),
+                })
+        }
         Err(e) => {
             warn!("failed to get permanent index: {}", e);
             None
