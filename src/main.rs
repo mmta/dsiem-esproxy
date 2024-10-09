@@ -64,6 +64,17 @@ struct ServeArgs {
     /// TCP port for the HTTP server to listen on
     #[arg(short('p'), long = "tcp-port", env = "DSIEM_ESPROXY_PORT", value_name = "tcp", default_value_t = 8181)]
     port: u16,
+
+    /// Maximum content length (in MB) for the HTTP server, taking into account
+    /// bulk alarm inserts
+    #[arg(
+        long = "max-content-length",
+        value_name = "MB",
+        env = "DSIEM_ESPROXY_MAX_CONTENT_LENGTH",
+        default_value_t = 10
+    )]
+    max_content_length: usize,
+
     /// Elasticsearch endpoint
     #[arg(
         short('e'),
@@ -81,6 +92,14 @@ struct ServeArgs {
         default_value_t = false
     )]
     use_elasticsearch: bool,
+    /// Wether to accept self-signed certificates for ES endpoint
+    #[arg(
+        long = "accept-invalid-cert",
+        value_name = "boolean",
+        env = "DSIEM_ESPROXY_ACCEPT_INVALID_CERT",
+        default_value_t = false
+    )]
+    accept_invalid_cert: bool,
     /// Elasticsearch index for alarm id lookup
     #[arg(
         short('x'),
@@ -227,6 +246,7 @@ async fn serve(listen: bool, require_logging: bool, args: Cli) -> Result<()> {
                 upsert_template: sargs.upsert_template,
                 id_index: sargs.id_index.into(),
                 alarm_index: sargs.alarm_index.into(),
+                accept_invalid_cert: sargs.accept_invalid_cert,
             },
             server::SurrealDBSink {
                 url: sargs.surrealdb.into(),
@@ -238,6 +258,7 @@ async fn serve(listen: bool, require_logging: bool, args: Cli) -> Result<()> {
             },
             sargs.status,
             sargs.tag,
+            sargs.max_content_length,
         )?;
         let listener = tokio::net::TcpListener::bind(addr.clone()).await?;
         let signal = async move {

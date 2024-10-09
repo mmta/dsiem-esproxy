@@ -47,7 +47,7 @@ pub(crate) async fn send_alarm(
     }
     debug!(alarm.id, "{}", msg);
 
-    post_to_es(&state.es.url, &perm_index, auth_header, alarm).await.map_err(|e| {
+    post_to_es(&state.es.url, &perm_index, auth_header, alarm, state.es.accept_invalid_cert).await.map_err(|e| {
         warn!(alarm.id = alarm_id.to_string(), "failed to send alarm: {}", e);
         AppError::from(e)
     })
@@ -145,8 +145,9 @@ async fn post_to_es(
     index: &str,
     auth_header: Option<&str>,
     alarm: Arc<Backlog>,
+    accept_invalid_cert: bool,
 ) -> Result<(), anyhow::Error> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder().danger_accept_invalid_certs(accept_invalid_cert).build()?;
     let mut req = client.post(format!("{}/{}/_update/{}", es_url, index, alarm.id));
     if let Some(auth) = auth_header {
         req = req.header("Authorization", auth);
