@@ -7,7 +7,7 @@ use std::{
 use anyhow::Result;
 use arcstr::ArcStr;
 use axum::{
-    extract::{ConnectInfo, FromRequest, State},
+    extract::{ConnectInfo, DefaultBodyLimit, FromRequest, State},
     http::{header::HeaderMap, StatusCode},
     routing::post,
     Router,
@@ -47,6 +47,7 @@ pub struct ESSink {
     pub id_index: ArcStr,
     pub alarm_index: ArcStr,
     pub upsert_template: bool,
+    pub accept_invalid_cert: bool,
 }
 #[derive(Clone)]
 pub struct SurrealDBSink {
@@ -63,6 +64,7 @@ pub fn app(
     surrealdb: SurrealDBSink,
     valid_status: Vec<String>,
     valid_tag: Vec<String>,
+    max_mb_length: usize,
 ) -> Result<Router> {
     // Time to live (TTL): 24 hours
     // Time to idle (TTI):  30 minutes
@@ -86,7 +88,9 @@ pub fn app(
         Router::new().route("/alarms", post(alarms_handler)).route("/alarms/", post(alarms_handler)).with_state(state)
     }
 
-    let app = routes(state).layer(TimeoutLayer::new(Duration::from_secs(5)));
+    let app = routes(state)
+        .layer(TimeoutLayer::new(Duration::from_secs(5)))
+        .layer(DefaultBodyLimit::max(max_mb_length * 1024 * 1024));
     Ok(app)
 }
 
@@ -166,6 +170,7 @@ mod tests {
                 id_index: ArcStr::from("siem_alarm_lookup"),
                 alarm_index: ArcStr::from("siem_alarm"),
                 upsert_template: true,
+                accept_invalid_cert: true,
             },
             SurrealDBSink {
                 url: ArcStr::from("http://localhost:18000"),
@@ -177,6 +182,7 @@ mod tests {
             },
             vec!["Open".to_string(), "In Progress".to_string(), "Closed".to_string()],
             vec!["Identified Threat".to_string(), "Valid Threat".to_string()],
+            10,
         )
         .unwrap()
         .layer(MockConnectInfo(SocketAddr::from(([1, 3, 3, 7], 666))))
